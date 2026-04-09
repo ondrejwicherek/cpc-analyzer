@@ -374,15 +374,6 @@ body.no-pls .main { margin-left: 0; display: flex; align-items: center; justify-
     <div class="sb-brand-tool">CPC Analyzer</div>
   </div>
 
-  <div class="sb-sect">Ceníky CPC</div>
-  <div class="drop-zone mb-2" id="dropZone" onclick="document.getElementById('fileIn').click()">
-    <i class="bi bi-upload di"></i>
-    <div class="dt">Přetáhnout nebo kliknout</div>
-    <div class="ds">Více souborů XLSX najednou</div>
-  </div>
-  <div id="plMsg"></div>
-  <div id="plList"></div>
-
   <div class="sb-sect">Heureka API</div>
 
   <div class="mb-2">
@@ -810,20 +801,11 @@ async function loadPreloaded(market) {
 }
 
 function renderPlList() {
-  document.getElementById('plList').innerHTML = S.pls.map(pl=>`
-    <div class="pl-item">
-      <div>
-        <i class="bi bi-file-earmark-spreadsheet me-1" style="color:#4ade80"></i>
-        <span class="small fw-semibold">${fmtLabel(pl.label)}</span>
-        <span class="ms-1" style="color:rgba(255,255,255,.4);font-size:.75rem">(${pl.categories.length})</span>
-      </div>
-    </div>`).join('');
-
-  // Column visibility toggles (show when 4+ price lists)
+  // Column visibility toggles
   const visEl = document.getElementById('colVisibility');
-  if (S.pls.length >= 4) {
+  if (S.pls.length >= 1) {
     visEl.innerHTML = `
-      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.35);margin:.6rem 0 .3rem">
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45);margin:1.2rem 0 .4rem;border-top:1px solid rgba(255,255,255,.08);padding-top:.9rem">
         Viditelnost sloupců
       </div>
       ${S.pls.map(pl => {
@@ -1022,6 +1004,9 @@ function renderTable() {
         const cat = pl.categories.find(c=>c.id===r.id);
         return cat ? (cat.cpcs[br]??null) : null;
       });
+      // Skip bracket rows where every price list has null or zero
+      if (!brCpcs.some(v=>v!=null&&v>0)) return '';
+
       const brFirst = brCpcs.find(v=>v!=null&&v>0);
       const brLast  = [...brCpcs].reverse().find(v=>v!=null&&v>0);
       const brCh    = (brFirst&&brLast&&brFirst!==0) ? (brLast-brFirst)/brFirst*100 : null;
