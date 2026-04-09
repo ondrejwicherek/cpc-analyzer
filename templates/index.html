@@ -185,6 +185,16 @@ body.no-pls .main { margin-left: 0; display: flex; align-items: center; justify-
 .welcome-drop .wd-hint { font-size: .7rem; color: rgba(255,255,255,.22); margin-top: .65rem; }
 .welcome-drop #plMsg { text-align: left; }
 
+/* ── MARKET BUTTONS ──────────────────────────────── */
+.welcome-market-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: .4rem;
+  background: var(--m-card); border: 2px solid var(--m-border);
+  border-radius: 12px; padding: 1.2rem .75rem; cursor: pointer;
+  transition: .15s; color: #fff;
+}
+.welcome-market-btn:hover { border-color: var(--m-orange); background: rgba(245,74,35,.08); }
+.wmb-label { font-size: .85rem; font-weight: 600; color: #fff; }
+
 /* ── HOW TO USE ──────────────────────────────────── */
 .how-card {
   background: var(--m-card);
@@ -306,6 +316,42 @@ body.no-pls .main { margin-left: 0; display: flex; align-items: center; justify-
 
 /* ── TABLE ROW COUNT / scrollbar ─────────────────── */
 .table-responsive { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.1) transparent; }
+
+/* ── STICKY FIRST COLUMN ─────────────────────────── */
+.tbl-cpc thead th:first-child {
+  position: sticky; left: 0; z-index: 3;
+  background: rgba(0,0,0,.5) !important;
+}
+.tbl-cpc tbody td:first-child {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--m-dark) !important;
+}
+.tbl-cpc .cat-row:hover td:first-child { background: rgba(13,58,48,.95) !important; }
+.tbl-cpc .detail-row td:first-child { background: rgba(0,0,0,.35) !important; }
+
+/* ── COLUMN VISIBILITY TOGGLES ───────────────────── */
+#colVisibility { margin-top: .5rem; }
+.col-vis-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .25rem .5rem; border-radius: 5px;
+  margin-bottom: .2rem;
+  background: rgba(0,0,0,.15);
+  border: 1px solid var(--m-border);
+}
+.col-vis-label {
+  font-size: .78rem; color: rgba(255,255,255,.7);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 195px;
+}
+.col-vis-label.hidden-pl { color: rgba(255,255,255,.3); text-decoration: line-through; }
+.btn-eye {
+  background: transparent; border: none; padding: 0 .2rem;
+  color: rgba(255,255,255,.4); cursor: pointer; font-size: .9rem;
+  line-height: 1; flex-shrink: 0;
+  transition: color .15s;
+}
+.btn-eye:hover { color: rgba(255,255,255,.85); }
+.btn-eye.eye-hidden { color: rgba(255,100,100,.5); }
 </style>
 </head>
 <body>
@@ -375,6 +421,8 @@ body.no-pls .main { margin-left: 0; display: flex; align-items: center; justify-
     <i class="bi bi-cloud-download me-1"></i>Načíst data kategorií
   </button>
   <div id="apiMsg"></div>
+
+  <div id="colVisibility"></div>
 </div>
 
 <!-- ======= MAIN ======= -->
@@ -384,17 +432,23 @@ body.no-pls .main { margin-left: 0; display: flex; align-items: center; justify-
   <div id="welcomeState">
     <div class="welcome-outer">
 
-      <!-- LEFT: upload -->
+      <!-- LEFT: market select + upload -->
       <div class="welcome-left">
         <div class="welcome-brand-maira">MAIRA</div>
         <div class="welcome-brand-tool">CPC Analyzer</div>
-        <div class="welcome-drop" id="welcomeDrop" onclick="document.getElementById('fileIn').click()">
-          <i class="bi bi-file-earmark-spreadsheet wd-icon"></i>
-          <div class="wd-title">Nahrajte ceník CPC</div>
-          <div class="wd-sub">Přetáhněte nebo klikněte pro výběr souboru</div>
-          <div class="wd-hint">Formát XLSX · lze nahrát více souborů najednou</div>
+
+        <div style="display:flex;gap:.75rem;margin-bottom:.75rem">
+          <button class="welcome-market-btn" onclick="selectMarket('cz')">
+            <span style="font-size:1.5rem">🇨🇿</span>
+            <span class="wmb-label">Heureka CZ</span>
+          </button>
+          <button class="welcome-market-btn" onclick="selectMarket('sk')">
+            <span style="font-size:1.5rem">🇸🇰</span>
+            <span class="wmb-label">Heureka SK</span>
+          </button>
         </div>
-        <div id="plMsg" style="margin-top:.6rem"></div>
+
+        <div id="plMsg" style="margin-bottom:.5rem"></div>
       </div>
 
       <!-- RIGHT: how to use -->
@@ -480,6 +534,8 @@ const S = {
   catParents: {},  // child_id → parent_id (from XML)
   charts: {},
   expanded: new Set(),
+  hiddenPls: new Set(),  // labels of price lists whose columns are hidden
+  market: null,    // 'cz' or 'sk'
 };
 
 // ── INIT ──────────────────────────────────────────────────────────────
@@ -490,7 +546,8 @@ renderAll();
 function fmtD(d)  { return d.toISOString().split('T')[0]; }
 function fmtEur(v, dec=3) {
   if (v == null) return '—';
-  return v.toLocaleString('cs-CZ',{minimumFractionDigits:dec,maximumFractionDigits:dec}) + '\u00a0€';
+  const currency = S.market === 'cz' ? '\u00a0Kč' : '\u00a0€';
+  return v.toLocaleString('cs-CZ',{minimumFractionDigits:dec,maximumFractionDigits:dec}) + currency;
 }
 function fmtPct(v, dec=1) {
   if (v == null) return '—';
@@ -503,6 +560,13 @@ function shortName(id) {
 function fullName(id) { return S.names[id] || ('Kategorie '+id); }
 
 function fmtLabel(lbl) {
+  // Strip market prefix like "CZ: " or "SK: " then format date
+  const prefixMatch = lbl.match(/^[A-Z]+:\s*(\d{4}-\d{2}-\d{2})$/);
+  if (prefixMatch) {
+    const datePart = prefixMatch[1];
+    const m = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${parseInt(m[3])}.\u00a0${parseInt(m[2])}.\u00a0${m[1]}` : datePart;
+  }
   const m = lbl.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return m ? `${parseInt(m[3])}.\u00a0${parseInt(m[2])}.\u00a0${m[1]}` : lbl;
 }
@@ -639,7 +703,7 @@ async function fetchApi() {
 
 // ── PRICE LISTS ───────────────────────────────────────────────────────
 function setupDrop() {
-  [document.getElementById('dropZone'), document.getElementById('welcomeDrop')].forEach(z => {
+  [document.getElementById('dropZone')].forEach(z => {
     if (!z) return;
     z.addEventListener('dragover', e=>{ e.preventDefault(); z.classList.add('over'); });
     z.addEventListener('dragleave', ()=>z.classList.remove('over'));
@@ -699,8 +763,50 @@ async function uploadPl(file) {
 
 function removePl(lbl) {
   S.pls = S.pls.filter(p=>p.label!==lbl);
+  S.hiddenPls.delete(lbl);
   S.expanded.clear();
   buildNames(); renderPlList(); renderAll();
+}
+
+function togglePlVisibility(lbl) {
+  if (S.hiddenPls.has(lbl)) S.hiddenPls.delete(lbl);
+  else S.hiddenPls.add(lbl);
+  renderPlList(); renderAll();
+}
+
+async function selectMarket(market) {
+  S.market = market;
+  // Sync with Heureka API market toggle
+  const radio = document.querySelector(`input[name="market"][value="${market}"]`);
+  if (radio) radio.checked = true;
+
+  const plMsgEl = document.getElementById('plMsg');
+  plMsgEl.innerHTML = `<div style="color:rgba(255,255,255,.5);font-size:.8rem"><i class="bi bi-hourglass me-1"></i>Načítám ceníky ${market.toUpperCase()}…</div>`;
+  await loadPreloaded(market);
+  if (S.pls.length === 0) plMsgEl.innerHTML = alertHtml('danger', 'Ceníky se nepodařilo načíst.');
+}
+
+async function loadPreloaded(market) {
+  const prefix = market === 'cz' ? 'CZ: ' : 'SK: ';
+  try {
+    const resp = await fetch(`/api/preloaded-pricelists/${market}`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!Array.isArray(data)) return;
+    for (const item of data) {
+      const labelWithPrefix = prefix + item.label;
+      // Skip duplicates
+      if (S.pls.find(p => p.label === labelWithPrefix)) continue;
+      S.pls.push({ label: labelWithPrefix, brackets: item.brackets, categories: item.categories });
+    }
+    S.pls.sort((a, b) => a.label.localeCompare(b.label));
+    buildNames(); renderPlList(); renderAll();
+    // Clear loading message now that data is loaded
+    const plMsgEl = document.getElementById('plMsg');
+    if (plMsgEl && plMsgEl.innerHTML.includes('Načítám')) plMsgEl.innerHTML = '';
+  } catch(e) {
+    console.warn(`loadPreloaded(${market}) failed:`, e);
+  }
 }
 
 function renderPlList() {
@@ -711,9 +817,29 @@ function renderPlList() {
         <span class="small fw-semibold">${fmtLabel(pl.label)}</span>
         <span class="ms-1" style="color:rgba(255,255,255,.4);font-size:.75rem">(${pl.categories.length})</span>
       </div>
-      <button class="btn btn-sm btn-link p-0 lh-1" style="color:rgba(255,100,100,.7)"
-        onclick="removePl('${pl.label.replace(/'/g,"\\'")}')"><i class="bi bi-x-lg"></i></button>
     </div>`).join('');
+
+  // Column visibility toggles (show when 4+ price lists)
+  const visEl = document.getElementById('colVisibility');
+  if (S.pls.length >= 4) {
+    visEl.innerHTML = `
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.35);margin:.6rem 0 .3rem">
+        Viditelnost sloupců
+      </div>
+      ${S.pls.map(pl => {
+        const hidden = S.hiddenPls.has(pl.label);
+        const safeLabel = pl.label.replace(/'/g, "\\'");
+        return `<div class="col-vis-item">
+          <span class="col-vis-label${hidden?' hidden-pl':''}" title="${pl.label}">${fmtLabel(pl.label)}</span>
+          <button class="btn-eye${hidden?' eye-hidden':''}" title="${hidden?'Zobrazit':'Skrýt'} sloupec"
+            onclick="togglePlVisibility('${safeLabel}')">
+            <i class="bi ${hidden?'bi-eye-slash':'bi-eye'}"></i>
+          </button>
+        </div>`;
+      }).join('')}`;
+  } else {
+    visEl.innerHTML = '';
+  }
 }
 
 function buildNames() {
@@ -741,8 +867,9 @@ function resolveToPlId(apiCatId, plIds) {
 }
 
 function buildRows() {
+  const visiblePls = S.pls.filter(pl => !S.hiddenPls.has(pl.label));
   const plIds = new Set();
-  for (const pl of S.pls) for (const c of pl.categories) plIds.add(c.id);
+  for (const pl of visiblePls) for (const c of pl.categories) plIds.add(c.id);
 
   const totCost = S.api ? S.api.reduce((s,r)=>s+r.cost,0)    : 0;
   const totRev  = S.api ? S.api.reduce((s,r)=>s+r.revenue,0) : 0;
@@ -764,7 +891,7 @@ function buildRows() {
   return Array.from(plIds)
     .filter(id => !hasApi || rolled[id])
     .map(id => {
-      const cpcs   = S.pls.map(pl => avgCpc(pl, id));
+      const cpcs   = visiblePls.map(pl => avgCpc(pl, id));
       const first  = cpcs.find(v => v !== null);
       const last   = [...cpcs].reverse().find(v => v !== null);
       const change = (first && last && first !== 0) ? (last - first) / first * 100 : null;
@@ -822,8 +949,9 @@ function renderTable() {
   const q = (document.getElementById('srchBox').value||'').toLowerCase();
   const sort = document.getElementById('sortSel').value;
   const chgOnly = document.getElementById('chgOnly').checked;
+  const visiblePls = S.pls.filter(pl => !S.hiddenPls.has(pl.label));
   const hasApi = S.api && S.api.length>0;
-  const multiPl = S.pls.length>1;
+  const multiPl = visiblePls.length>1;
 
   let filtered = rows.filter(r=>{
     if (q && !shortName(r.id).toLowerCase().includes(q) && !fullName(r.id).toLowerCase().includes(q)) return false;
@@ -840,7 +968,7 @@ function renderTable() {
   document.getElementById('tHead').innerHTML = `<tr>
     <th style="min-width:230px">Kategorie</th>
     ${hasApi ? '<th class="text-center" style="min-width:68px">% nákl.</th><th class="text-center" style="min-width:68px">% tržeb</th><th class="text-center" style="min-width:72px">Prokliky</th>' : ''}
-    ${S.pls.map(pl=>`<th class="text-center" style="min-width:100px">${fmtLabel(pl.label)}</th>`).join('')}
+    ${visiblePls.map(pl=>`<th class="text-center" style="min-width:100px">${fmtLabel(pl.label)}</th>`).join('')}
     ${multiPl ? '<th class="text-center" style="min-width:85px">Změna</th>' : ''}
   </tr>`;
 
@@ -888,9 +1016,9 @@ function renderTable() {
       ${apiCells}${cpcCells}${changeCell}
     </tr>`;
 
-    const brackets = S.pls.length ? S.pls[0].brackets : [];
+    const brackets = visiblePls.length ? visiblePls[0].brackets : [];
     const detailRows = brackets.map(br => {
-      const brCpcs = S.pls.map(pl=>{
+      const brCpcs = visiblePls.map(pl=>{
         const cat = pl.categories.find(c=>c.id===r.id);
         return cat ? (cat.cpcs[br]??null) : null;
       });
@@ -924,7 +1052,7 @@ function renderTable() {
       const apiBlank = hasApi ? '<td></td><td></td><td></td>' : '';
 
       return `<tr class="detail-row detail-${r.id}" style="display:${isOpen?'':'none'}">
-        <td><span style="color:rgba(255,255,255,.25)" class="me-1">└</span>${br} €</td>
+        <td><span style="color:rgba(255,255,255,.25)" class="me-1">└</span>${br}</td>
         ${apiBlank}${brCells}${brChCell}
       </tr>`;
     }).join('');
