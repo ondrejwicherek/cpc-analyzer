@@ -780,7 +780,7 @@ async function selectMarket(market) {
 async function loadPreloaded(market) {
   const prefix = market === 'cz' ? 'CZ: ' : 'SK: ';
   try {
-    const resp = await fetch(`/api/preloaded-pricelists/${market}`);
+    const resp = await fetch(`/static/data/${market}_pricelists.json`);
     if (!resp.ok) return;
     const data = await resp.json();
     if (!Array.isArray(data)) return;
