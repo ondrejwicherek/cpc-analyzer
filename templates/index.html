@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CPC Analyzer · MAIRA</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+/* ── MAIRA PALETTE ───────────────────────────────── */
+:root {
+  --m-dark:    #083027;
+  --m-mid:     #0b4034;
+  --m-card:    #0d4a3c;
+  --m-border:  rgba(255,255,255,.08);
+  --m-orange:  #F54A23;
+  --m-orange2: #d43a15;
+  --m-salmon:  #ff7f61;
+  --m-light:   #dceae8;
+  --m-lighter: #E6F0EE;
+  --m-muted:   rgba(255,255,255,.45);
+  --sb: 295px;
+}
+
+/* ── BASE ────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--m-dark);
+  color: #fff;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: .9rem;
+  margin: 0;
+}
+
+/* ── SIDEBAR ─────────────────────────────────────── */
+.sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: var(--sb);
+  background: var(--m-mid);
+  border-right: 1px solid var(--m-border);
+  overflow-y: auto; padding: 1.25rem; z-index: 100;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.15) transparent;
+}
+
+.sb-brand { margin-bottom: 1.6rem; }
+.sb-brand-maira {
+  font-size: .65rem; font-weight: 800; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--m-orange);
+  margin-bottom: 0;
+}
+.sb-brand-tool {
+  font-size: 1.1rem; font-weight: 700; color: #fff; line-height: 1.1;
+}
+
+.sb-sect {
+  font-size: .65rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--m-muted);
+  margin: 1.2rem 0 .55rem; border-top: 1px solid var(--m-border);
+  padding-top: .9rem;
+}
+.sb-sect:first-of-type { border-top: none; padding-top: 0; }
+
+/* ── FORM CONTROLS (sidebar) ─────────────────────── */
+.form-label { color: rgba(255,255,255,.7); font-size: .78rem; margin-bottom: .3rem; }
+
+.form-control, .form-select {
+  background: rgba(0,0,0,.25) !important;
+  border: 1px solid rgba(255,255,255,.15) !important;
+  color: #fff !important;
+  font-size: .82rem;
+}
+.form-control::placeholder { color: rgba(255,255,255,.3) !important; }
+.form-control:focus, .form-select:focus {
+  border-color: var(--m-orange) !important;
+  box-shadow: 0 0 0 2px rgba(245,74,35,.25) !important;
+  background: rgba(0,0,0,.3) !important;
+}
+.form-select option { background: var(--m-mid); color: #fff; }
+
+/* Market toggle */
+.btn-check + .btn-outline-primary {
+  border-color: rgba(255,255,255,.2) !important;
+  color: rgba(255,255,255,.7) !important;
+  background: transparent !important;
+  font-size: .8rem;
+}
+.btn-check:checked + .btn-outline-primary {
+  background: var(--m-orange) !important;
+  border-color: var(--m-orange) !important;
+  color: #fff !important;
+}
+.btn-check + .btn-outline-primary:hover {
+  background: rgba(255,255,255,.06) !important;
+}
+
+/* Primary CTA */
+.btn-primary {
+  background: var(--m-orange) !important;
+  border-color: var(--m-orange) !important;
+  color: #fff !important;
+  font-weight: 600; letter-spacing: .02em;
+  transition: background .15s;
+}
+.btn-primary:hover { background: var(--m-orange2) !important; border-color: var(--m-orange2) !important; }
+
+.btn-outline-secondary {
+  border-color: rgba(255,255,255,.2) !important;
+  color: rgba(255,255,255,.6) !important;
+  background: transparent !important;
+}
+.btn-outline-secondary:hover { background: rgba(255,255,255,.08) !important; }
+
+/* ── DROP ZONE ───────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed rgba(255,255,255,.2);
+  border-radius: 8px; padding: 1.1rem;
+  text-align: center; cursor: pointer; transition: .15s;
+  background: rgba(0,0,0,.15);
+}
+.drop-zone:hover, .drop-zone.over {
+  border-color: var(--m-orange);
+  background: rgba(245,74,35,.07);
+}
+.drop-zone .di { font-size: 1.4rem; display: block; margin-bottom: .3rem; color: var(--m-muted); }
+.drop-zone .dt { font-size: .82rem; color: rgba(255,255,255,.6); }
+.drop-zone .ds { font-size: .7rem; color: var(--m-muted); }
+
+/* ── PRICE LIST ITEMS ────────────────────────────── */
+.pl-item {
+  background: rgba(0,0,0,.2);
+  border: 1px solid var(--m-border);
+  border-radius: 6px;
+  padding: .4rem .7rem; margin-bottom: .35rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.pl-item .fw-semibold { color: #fff; }
+.pl-item .text-muted { color: var(--m-muted) !important; }
+
+/* ── ALERTS (sidebar) ────────────────────────────── */
+.alert-success {
+  background: rgba(22,163,74,.18) !important;
+  border-color: rgba(22,163,74,.3) !important;
+  color: #86efac !important;
+}
+.alert-danger {
+  background: rgba(220,38,38,.18) !important;
+  border-color: rgba(220,38,38,.3) !important;
+  color: #fca5a5 !important;
+}
+.alert-warning {
+  background: rgba(245,158,11,.15) !important;
+  border-color: rgba(245,158,11,.3) !important;
+  color: #fcd34d !important;
+}
+
+/* ── MAIN CONTENT ────────────────────────────────── */
+.main { margin-left: var(--sb); min-height: 100vh; padding: 1.5rem; }
+body.no-pls .sidebar { display: none; }
+body.no-pls .main { margin-left: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+
+/* ── WELCOME LAYOUT ──────────────────────────────── */
+.welcome-outer { display: flex; gap: 2rem; align-items: flex-start; justify-content: center; width: 100%; max-width: 860px; flex-wrap: wrap; }
+.welcome-left  { flex: 1 1 340px; max-width: 400px; }
+.welcome-right { flex: 1 1 340px; max-width: 400px; }
+
+.welcome-brand-maira { font-size: .65rem; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: var(--m-orange); margin-bottom: 0; }
+.welcome-brand-tool  { font-size: 1.4rem; font-weight: 700; color: #fff; margin-bottom: 1.5rem; }
+
+.welcome-drop {
+  border: 2px dashed rgba(255,255,255,.2);
+  border-radius: 14px; padding: 2.5rem 1.5rem;
+  cursor: pointer; transition: .15s;
+  background: rgba(0,0,0,.15); text-align: center;
+}
+.welcome-drop:hover, .welcome-drop.over {
+  border-color: var(--m-orange);
+  background: rgba(245,74,35,.07);
+}
+.welcome-drop .wd-icon { font-size: 2.2rem; color: rgba(255,255,255,.25); display: block; margin-bottom: .9rem; }
+.welcome-drop .wd-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: .3rem; }
+.welcome-drop .wd-sub { font-size: .82rem; color: rgba(255,255,255,.45); }
+.welcome-drop .wd-hint { font-size: .7rem; color: rgba(255,255,255,.22); margin-top: .65rem; }
+.welcome-drop #plMsg { text-align: left; }
+
+/* ── HOW TO USE ──────────────────────────────────── */
+.how-card {
+  background: var(--m-card);
+  border: 1px solid var(--m-border);
+  border-radius: 14px; padding: 1.5rem 1.6rem;
+}
+.how-card h6 { color: var(--m-orange); font-weight: 700; font-size: .95rem; margin-bottom: 1rem; }
+.how-steps { list-style: none; padding: 0; margin: 0 0 1.1rem; }
+.how-steps li {
+  display: flex; gap: .6rem; align-items: flex-start;
+  font-size: .83rem; color: rgba(255,255,255,.75);
+  margin-bottom: .55rem;
+}
+.how-steps li .sn {
+  min-width: 1.3rem; height: 1.3rem; border-radius: 50%;
+  background: var(--m-orange); color: #fff;
+  font-size: .7rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: .05rem; flex-shrink: 0;
+}
+.how-steps li .st { line-height: 1.4; }
+.how-steps li .st b { color: #fff; font-weight: 600; }
+.how-optional {
+  background: rgba(0,0,0,.2); border-radius: 8px;
+  padding: .75rem 1rem; font-size: .78rem;
+  color: rgba(255,255,255,.45); border-left: 2px solid rgba(255,255,255,.1);
+}
+.how-optional strong { color: rgba(255,255,255,.6); }
+
+/* ── STAT CARDS ──────────────────────────────────── */
+.card {
+  background: var(--m-card);
+  border: 1px solid var(--m-border);
+  border-radius: 10px;
+  color: #fff;
+}
+.stat-card { text-align: center; padding: 1rem 0.75rem; }
+.stat-val { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+.stat-lbl { font-size: .72rem; color: var(--m-muted); margin-top: .25rem; text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── CONTROLS BAR ────────────────────────────────── */
+.sec-head { font-weight: 700; font-size: .88rem; color: #fff; letter-spacing: .01em; }
+.legend-txt { color: rgba(255,255,255,.55); }
+
+/* ── TABLE ───────────────────────────────────────── */
+.tbl-cpc { font-size: .82rem; color: #fff; --bs-table-bg: transparent; --bs-table-color: #fff; --bs-table-border-color: var(--m-border); }
+.tbl-cpc thead tr th {
+  background: rgba(0,0,0,.3) !important;
+  color: rgba(255,255,255,.6) !important;
+  border-color: var(--m-border) !important;
+  font-size: .75rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .05em;
+  white-space: nowrap; padding: .6rem .75rem;
+}
+.tbl-cpc tbody td {
+  background: transparent !important;
+  border-color: var(--m-border) !important;
+  color: #fff !important;
+  padding: .55rem .75rem;
+  vertical-align: middle;
+}
+.tbl-cpc .cat-row td { background: transparent !important; }
+.tbl-cpc .cat-row { cursor: pointer; transition: background .1s; }
+.tbl-cpc .cat-row:hover td { background: rgba(255,255,255,.04) !important; }
+.tbl-cpc .detail-row td {
+  background: rgba(0,0,0,.18) !important;
+  color: #fff !important;
+  font-size: .77rem;
+}
+.tbl-cpc .detail-row td:first-child { padding-left: 2.5rem; color: rgba(255,255,255,.5) !important; }
+
+/* CPC change colors for dark bg */
+.cpc-up   { background: rgba(220,38,38,.22) !important; }
+.cpc-down { background: rgba(0,210,120,.10) !important; }
+.tbl-cpc td.change-up   { color: #ff6b6b !important; font-weight: 700; }
+.tbl-cpc td.change-down { color: #00d478 !important; font-weight: 700; }
+.tbl-cpc td.change-none { color: rgba(255,255,255,.3) !important; }
+
+/* ── EXPAND ICON ─────────────────────────────────── */
+.expand-icon {
+  transition: transform .18s; display: inline-block;
+  color: rgba(255,255,255,.3); font-size: .75rem;
+}
+.expand-icon.open { transform: rotate(90deg); color: var(--m-orange); }
+
+/* ── PCT BADGES ──────────────────────────────────── */
+.pct-badge { font-size: .72rem; border-radius: 4px; padding: 2px 6px; white-space: nowrap; font-weight: 600; }
+.pct-cost { background: rgba(245,158,11,.18); color: #fcd34d; }
+.pct-rev  { background: rgba(34,211,238,.15); color: #67e8f9; }
+
+/* ── EMPTY STATE ─────────────────────────────────── */
+.empty { text-align: center; padding: 5rem 1rem; color: var(--m-muted); }
+.empty i { font-size: 3rem; display: block; margin-bottom: 1.25rem; opacity: .4; }
+.empty h6 { color: rgba(255,255,255,.7); font-size: 1rem; margin-bottom: .5rem; }
+.empty p { font-size: .85rem; color: var(--m-muted); }
+
+/* ── LOADING OVERLAY ─────────────────────────────── */
+#overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(8,48,39,.75); backdrop-filter: blur(3px);
+  z-index: 9999; align-items: center; justify-content: center;
+}
+.spin-box {
+  background: var(--m-mid);
+  border: 1px solid var(--m-border);
+  border-radius: 14px; padding: 2rem 2.75rem;
+  text-align: center; min-width: 240px;
+}
+.spin-box .spinner-border { color: var(--m-orange) !important; }
+.spin-box #overlayMsg { color: rgba(255,255,255,.6); font-size: .85rem; margin-top: .5rem; }
+
+/* ── ROW COUNT ───────────────────────────────────── */
+#rowCount { color: var(--m-muted); font-size: .78rem; }
+
+/* ── FORM CHECK (switch) ─────────────────────────── */
+.form-check-input { background-color: rgba(255,255,255,.2) !important; border-color: rgba(255,255,255,.3) !important; }
+.form-check-input:checked { background-color: var(--m-orange) !important; border-color: var(--m-orange) !important; }
+.form-check-label { color: rgba(255,255,255,.65); }
+
+/* ── TABLE ROW COUNT / scrollbar ─────────────────── */
+.table-responsive { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.1) transparent; }
+</style>
+</head>
+<body>
+
+<!-- Global file input (outside sidebar so it works even when sidebar is hidden) -->
+<input type="file" id="fileIn" accept=".xlsx,.xls" multiple style="display:none" onchange="onFiles(event)">
+
+<!-- Loading overlay -->
+<div id="overlay">
+  <div class="spin-box">
+    <div class="spinner-border" style="width:2.4rem;height:2.4rem"></div>
+    <div id="overlayMsg"></div>
+  </div>
+</div>
+
+<!-- ======= SIDEBAR ======= -->
+<div class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-brand-maira">MAIRA</div>
+    <div class="sb-brand-tool">CPC Analyzer</div>
+  </div>
+
+  <div class="sb-sect">Ceníky CPC</div>
+  <div class="drop-zone mb-2" id="dropZone" onclick="document.getElementById('fileIn').click()">
+    <i class="bi bi-upload di"></i>
+    <div class="dt">Přetáhnout nebo kliknout</div>
+    <div class="ds">Více souborů XLSX najednou</div>
+  </div>
+  <div id="plMsg"></div>
+  <div id="plList"></div>
+
+  <div class="sb-sect">Heureka API</div>
+
+  <div class="mb-2">
+    <label class="form-label">Trh</label>
+    <div class="btn-group btn-group-sm w-100" role="group">
+      <input type="radio" class="btn-check" name="market" id="mCZ" value="cz" checked>
+      <label class="btn btn-outline-primary" for="mCZ">🇨🇿 Heureka.cz</label>
+      <input type="radio" class="btn-check" name="market" id="mSK" value="sk">
+      <label class="btn btn-outline-primary" for="mSK">🇸🇰 Heureka.sk</label>
+    </div>
+  </div>
+
+  <div class="mb-2">
+    <label class="form-label">API klíč</label>
+    <div class="input-group input-group-sm">
+      <input type="password" class="form-control" id="apiKey" placeholder="x-heureka-api-key">
+      <button class="btn btn-outline-secondary" onclick="toggleKey()"><i class="bi bi-eye" id="eyeIco"></i></button>
+    </div>
+    <div style="font-size:.7rem;color:rgba(255,255,255,.35);margin-top:.35rem;line-height:1.35">
+      <i class="bi bi-shield-check" style="color:rgba(255,255,255,.25)"></i>
+      Klíč se nikam neukládá — používá se pouze pro přímé volání Heureka API.
+    </div>
+  </div>
+
+  <div class="mb-2">
+    <label class="form-label">Období</label>
+    <select class="form-select form-select-sm" id="periodSel">
+      <option value="7">Posledních 7 dní</option>
+      <option value="30" selected>Posledních 30 dní</option>
+      <option value="60">Posledních 60 dní</option>
+      <option value="90">Posledních 90 dní</option>
+    </select>
+  </div>
+
+  <button class="btn btn-primary btn-sm w-100 mb-1" onclick="fetchApi()">
+    <i class="bi bi-cloud-download me-1"></i>Načíst data kategorií
+  </button>
+  <div id="apiMsg"></div>
+</div>
+
+<!-- ======= MAIN ======= -->
+<div class="main">
+
+  <!-- Welcome / first-step upload -->
+  <div id="welcomeState">
+    <div class="welcome-outer">
+
+      <!-- LEFT: upload -->
+      <div class="welcome-left">
+        <div class="welcome-brand-maira">MAIRA</div>
+        <div class="welcome-brand-tool">CPC Analyzer</div>
+        <div class="welcome-drop" id="welcomeDrop" onclick="document.getElementById('fileIn').click()">
+          <i class="bi bi-file-earmark-spreadsheet wd-icon"></i>
+          <div class="wd-title">Nahrajte ceník CPC</div>
+          <div class="wd-sub">Přetáhněte nebo klikněte pro výběr souboru</div>
+          <div class="wd-hint">Formát XLSX · lze nahrát více souborů najednou</div>
+        </div>
+        <div id="plMsg" style="margin-top:.6rem"></div>
+      </div>
+
+      <!-- RIGHT: how to use -->
+      <div class="welcome-right">
+        <div class="how-card">
+          <h6><i class="bi bi-info-circle me-2"></i>Jak na to</h6>
+          <ol class="how-steps">
+            <li>
+              <span class="sn">1</span>
+              <span class="st">Nahrajte <b>ceník CPC</b> — XLSX s kategoriemi a cenovými hladinami. Lze nahrát více ceníků pro porovnání v čase.</span>
+            </li>
+            <li>
+              <span class="sn">2</span>
+              <span class="st">Tabulka se zobrazí hned. Každý sloupec = jeden ceník, v každé buňce vidíte CPC a změnu oproti předchozímu.</span>
+            </li>
+            <li>
+              <span class="sn">3</span>
+              <span class="st">Volitelně načtěte <b>Heureka API</b> — přidá reálná data (prokliky, % nákladů, % tržeb) pro každou kategorii.</span>
+            </li>
+          </ol>
+          <div class="how-optional">
+            <strong>Formát ceníku:</strong> první sloupec = ID kategorie, druhý = název, další sloupce = cenové hladiny (0.3, 0.5 …). Název souboru se použije jako datum/label.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" style="display:none">
+
+    <!-- Summary cards -->
+    <div class="row g-3 mb-3" id="summCards"></div>
+
+    <!-- Controls + Table -->
+    <div class="card p-3">
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <div class="sec-head mb-0 me-auto">Přehled kategorií</div>
+        <input type="text" class="form-control form-control-sm" id="srchBox"
+          placeholder="Hledat kategorii…" oninput="renderTable()" style="width:190px">
+        <select class="form-select form-select-sm" id="sortSel" onchange="renderTable()" style="width:auto">
+          <option value="cost_pct">% nákladů ↓</option>
+          <option value="rev_pct">% tržeb ↓</option>
+          <option value="change_desc">Největší zdražení</option>
+          <option value="change_asc">Největší zlevnění</option>
+          <option value="name">Název A–Z</option>
+        </select>
+        <div class="form-check form-switch mb-0 ms-1">
+          <input class="form-check-input" type="checkbox" id="chgOnly" onchange="renderTable()">
+          <label class="form-check-label" for="chgOnly">Jen změněné</label>
+        </div>
+      </div>
+
+      <div class="small legend-txt mb-2" id="legendRow" style="display:none">
+        <span class="pct-badge pct-cost me-1">% nákl.</span> = podíl na celkových nákladech &nbsp;
+        <span class="pct-badge pct-rev me-1">% tržeb</span> = podíl na celkových tržbách &nbsp;
+        <span style="color:rgba(255,255,255,.35)">Klik na řádek = detail hladin</span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm tbl-cpc mb-0">
+          <thead id="tHead"></thead>
+          <tbody id="tBody"></tbody>
+        </table>
+      </div>
+      <div class="mt-2" id="rowCount"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CHART.JS DARK DEFAULTS ───────────────────────────────────────────────
+Chart.defaults.color = 'rgba(255,255,255,0.55)';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+
+// ── STATE ─────────────────────────────────────────────────────────────
+const S = {
+  api: null,       // [{category_id, cost, revenue, …}]
+  pls: [],         // [{label, categories:[{id,name,cpcs:{bracket:val}}], brackets:[]}]
+  names: {},       // id→full name (merged: XML priority, price list fallback)
+  xmlNames: {},    // id→full name from Heureka XML
+  catParents: {},  // child_id → parent_id (from XML)
+  charts: {},
+  expanded: new Set(),
+};
+
+// ── INIT ──────────────────────────────────────────────────────────────
+setupDrop();
+renderAll();
+
+// ── UTILS ─────────────────────────────────────────────────────────────
+function fmtD(d)  { return d.toISOString().split('T')[0]; }
+function fmtEur(v, dec=3) {
+  if (v == null) return '—';
+  return v.toLocaleString('cs-CZ',{minimumFractionDigits:dec,maximumFractionDigits:dec}) + '\u00a0€';
+}
+function fmtPct(v, dec=1) {
+  if (v == null) return '—';
+  return (v>0?'+':'')+v.toFixed(dec)+'%';
+}
+function shortName(id) {
+  const n = S.names[id]; if (!n) return 'Kat. '+id;
+  const p = n.split('|').map(s=>s.trim()); return p[p.length-1];
+}
+function fullName(id) { return S.names[id] || ('Kategorie '+id); }
+
+function fmtLabel(lbl) {
+  const m = lbl.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${parseInt(m[3])}.\u00a0${parseInt(m[2])}.\u00a0${m[1]}` : lbl;
+}
+function alertHtml(t,m) { return `<div class="alert alert-${t} py-1 px-2 small mt-1">${m}</div>`; }
+function load(msg)  { document.getElementById('overlayMsg').textContent=msg; document.getElementById('overlay').style.display='flex'; }
+function unload()   { document.getElementById('overlay').style.display='none'; }
+function toggleKey(){ const i=document.getElementById('apiKey'),ic=document.getElementById('eyeIco'); i.type=i.type==='password'?'text':'password'; ic.className=i.type==='password'?'bi bi-eye':'bi bi-eye-slash'; }
+
+// ── API FETCH ─────────────────────────────────────────────────────────
+function getMarket() {
+  return document.querySelector('input[name="market"]:checked')?.value || 'cz';
+}
+
+async function fetchApi() {
+  const key = document.getElementById('apiKey').value.trim();
+  if (!key) { alert('Zadejte API klíč'); return; }
+  const days   = parseInt(document.getElementById('periodSel').value);
+  const market = getMarket();
+  const end = new Date(), start = new Date();
+  start.setDate(end.getDate() - days);
+
+  document.getElementById('apiMsg').innerHTML = '';
+
+  // Use Flask proxy if running via server, direct API if opened as file
+  const useProxy = location.protocol !== 'file:';
+
+  try {
+    load(`Stahuji data a kategorie (${market.toUpperCase()})…`);
+
+    let convData, catData;
+
+    if (useProxy) {
+      // ── via Flask proxy ───────────────────────────────────────────────
+      const [convResp, catResp] = await Promise.all([
+        fetch('/api/fetch-heureka', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({api_key: key, start_date: fmtD(start), end_date: fmtD(end)})
+        }),
+        fetch(`/api/heureka-categories?market=${market}`)
+      ]);
+      convData = await convResp.json();
+      if (!convResp.ok) { document.getElementById('apiMsg').innerHTML = alertHtml('danger', convData.error); return; }
+      catData  = await catResp.json();
+    } else {
+      // ── direct browser call ───────────────────────────────────────────
+      const aggregated = {};
+      let daysFetched = 0;
+      const errors = [];
+      const cur = new Date(start);
+      while (cur <= end) {
+        try {
+          const r = await fetch(`https://api.heureka.group/v1/reports/conversions?date=${fmtD(cur)}`, {
+            headers: { 'x-heureka-api-key': key }
+          });
+          if (r.status === 200) {
+            for (const conv of (await r.json()).conversions || []) {
+              const cid = String(conv.portal_category.id);
+              if (!aggregated[cid]) aggregated[cid] = { cost:0, revenue:0, visits:0, bidded_visits:0, orders:0 };
+              const a = aggregated[cid];
+              a.cost          += conv.costs_with_vat.total;
+              a.revenue       += conv.revenue.total;
+              a.visits        += conv.visits.total;
+              a.bidded_visits += conv.visits.bidded ?? 0;
+              a.orders        += conv.orders.total;
+            }
+            daysFetched++;
+          } else if ([401,403].includes(r.status)) {
+            document.getElementById('apiMsg').innerHTML = alertHtml('danger', `Autentizace selhala (HTTP ${r.status})`);
+            return;
+          } else { errors.push(`${fmtD(cur)}: HTTP ${r.status}`); }
+        } catch(e) { errors.push(`${fmtD(cur)}: ${e.message}`); }
+        cur.setDate(cur.getDate() + 1);
+      }
+      const data = Object.entries(aggregated).map(([category_id, a]) => ({
+        category_id,
+        cost:          Math.round(a.cost * 10000) / 10000,
+        revenue:       Math.round(a.revenue * 10000) / 10000,
+        visits:        a.visits,
+        bidded_visits: a.bidded_visits,
+        orders:        a.orders,
+        roas:          a.cost > 0 ? Math.round(a.revenue / a.cost * 100) / 100 : null,
+      })).sort((a,b) => b.cost - a.cost);
+      convData = { data, days_fetched: daysFetched, errors: errors.slice(0,10) };
+
+      // Categories XML — direct fetch
+      try {
+        const xmlUrl = `https://www.heureka.${market === 'sk' ? 'sk' : 'cz'}/direct/xml-export/shops/heureka-sekce.xml`;
+        const xr = await fetch(xmlUrl);
+        const xml = await xr.text();
+        const doc = new DOMParser().parseFromString(xml, 'text/xml');
+        const categories = {}, parents = {};
+        function parseNode(el, parentId) {
+          for (const cat of el.querySelectorAll(':scope > CATEGORY')) {
+            const idEl = cat.querySelector(':scope > CATEGORY_ID');
+            if (!idEl?.textContent.trim()) continue;
+            const cid = idEl.textContent.trim();
+            const fn = cat.querySelector(':scope > CATEGORY_FULLNAME')?.textContent.trim();
+            const nm = cat.querySelector(':scope > CATEGORY_NAME')?.textContent.trim();
+            if (fn) {
+              const parts = fn.split('|').map(p=>p.trim()).filter(Boolean);
+              categories[cid] = (parts[0]?.toLowerCase().startsWith('heureka') ? parts.slice(1) : parts).join(' | ');
+            } else { categories[cid] = nm || cid; }
+            if (parentId) parents[cid] = parentId;
+            parseNode(cat, cid);
+          }
+        }
+        parseNode(doc.documentElement);
+        catData = { categories, parents };
+      } catch { catData = { categories: {}, parents: {} }; }
+    }
+
+    if (catData.categories && !catData.error) {
+      S.xmlNames   = catData.categories;
+      S.catParents = catData.parents || {};
+      buildNames();
+    } else {
+      S.xmlNames = {}; S.catParents = {};
+    }
+
+    S.api = convData.data;
+    buildNames();
+    renderAll();
+
+    const errNote = convData.errors?.length
+      ? `<div style="font-size:.72rem;color:rgba(255,200,100,.8);margin-top:.3rem"><b>Chyby (${convData.errors.length}):</b> ${convData.errors[0]}</div>` : '';
+    const msgType = convData.data.length > 0 ? 'success' : 'warning';
+    document.getElementById('apiMsg').innerHTML =
+      alertHtml(msgType, `<i class="bi bi-check-circle me-1"></i>${convData.days_fetched} dní · ${convData.data.length} kategorií · ${Object.keys(catData.categories||{}).length} názvů z XML`) + errNote;
+
+  } catch(e) {
+    document.getElementById('apiMsg').innerHTML = alertHtml('danger', e.message);
+  } finally { unload(); }
+}
+
+// ── PRICE LISTS ───────────────────────────────────────────────────────
+function setupDrop() {
+  [document.getElementById('dropZone'), document.getElementById('welcomeDrop')].forEach(z => {
+    if (!z) return;
+    z.addEventListener('dragover', e=>{ e.preventDefault(); z.classList.add('over'); });
+    z.addEventListener('dragleave', ()=>z.classList.remove('over'));
+    z.addEventListener('drop', e=>{ e.preventDefault(); z.classList.remove('over');
+      Array.from(e.dataTransfer.files).filter(f=>/\.xlsx?$/i.test(f.name)).forEach(uploadPl); });
+  });
+}
+function onFiles(e) { Array.from(e.target.files).forEach(uploadPl); e.target.value=''; }
+
+function parseLabelFromName(n) {
+  const m = n.match(/(\d{1,2})[.\s]+(\d{1,2})[.\s]+(\d{4})/);
+  return m ? `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}` : n.replace(/\.xlsx?$/i,'');
+}
+
+async function uploadPl(file) {
+  const lbl = parseLabelFromName(file.name);
+  document.getElementById('plMsg').innerHTML = `<div style="color:rgba(255,255,255,.5);font-size:.8rem"><i class="bi bi-hourglass me-1"></i>${file.name}…</div>`;
+  try {
+    const buf = await file.arrayBuffer();
+    const wb  = XLSX.read(buf, { type: 'array' });
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    if (!rows.length) throw new Error('Prázdný soubor');
+    const header   = rows[0].map(c => String(c).trim());
+    const brackets = header.slice(2);
+    const categories = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const rawId = String(row[0] ?? '').trim();
+      if (!rawId) continue;
+      let secId;
+      try { secId = String(parseInt(parseFloat(rawId))); } catch { continue; }
+      if (isNaN(parseInt(secId))) continue;
+
+      const name = String(row[1] ?? '').trim();
+      const cpcs = {};
+      brackets.forEach((br, j) => {
+        const raw = String(row[2 + j] ?? '').replace(/€/g,'').replace(/\u00a0/g,'').replace(/\s/g,'').replace(',','.').trim();
+        cpcs[br] = raw ? (parseFloat(raw) || 0) : 0;
+      });
+      categories.push({ id: secId, name, cpcs });
+    }
+
+    const res = { label: lbl, categories, brackets };
+    let l = res.label; let n = 2;
+    while (S.pls.find(p => p.label === l)) l = res.label + ' (' + n++ + ')';
+    res.label = l;
+    S.pls.push(res);
+    S.pls.sort((a, b) => a.label.localeCompare(b.label));
+    buildNames(); renderPlList(); renderAll();
+    document.getElementById('plMsg').innerHTML = alertHtml('success',
+      `<i class="bi bi-check-circle me-1"></i>${categories.length} kategorií`);
+  } catch(e) { document.getElementById('plMsg').innerHTML = alertHtml('danger', e.message); }
+}
+
+function removePl(lbl) {
+  S.pls = S.pls.filter(p=>p.label!==lbl);
+  S.expanded.clear();
+  buildNames(); renderPlList(); renderAll();
+}
+
+function renderPlList() {
+  document.getElementById('plList').innerHTML = S.pls.map(pl=>`
+    <div class="pl-item">
+      <div>
+        <i class="bi bi-file-earmark-spreadsheet me-1" style="color:#4ade80"></i>
+        <span class="small fw-semibold">${fmtLabel(pl.label)}</span>
+        <span class="ms-1" style="color:rgba(255,255,255,.4);font-size:.75rem">(${pl.categories.length})</span>
+      </div>
+      <button class="btn btn-sm btn-link p-0 lh-1" style="color:rgba(255,100,100,.7)"
+        onclick="removePl('${pl.label.replace(/'/g,"\\'")}')"><i class="bi bi-x-lg"></i></button>
+    </div>`).join('');
+}
+
+function buildNames() {
+  S.names = {};
+  for (const pl of S.pls) for (const c of pl.categories) if (!S.names[c.id]) S.names[c.id] = c.name;
+  for (const [id, name] of Object.entries(S.xmlNames)) S.names[id] = name;
+}
+
+// ── CALCULATIONS ──────────────────────────────────────────────────────
+function avgCpc(pl, id) {
+  const c = pl.categories.find(x=>x.id===id); if (!c) return null;
+  const vals = Object.values(c.cpcs).filter(v=>v>0);
+  return vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : null;
+}
+
+function resolveToPlId(apiCatId, plIds) {
+  let id = String(apiCatId);
+  const seen = new Set();
+  while (id && !seen.has(id)) {
+    if (plIds.has(id)) return id;
+    seen.add(id);
+    id = S.catParents[id] || null;
+  }
+  return null;
+}
+
+function buildRows() {
+  const plIds = new Set();
+  for (const pl of S.pls) for (const c of pl.categories) plIds.add(c.id);
+
+  const totCost = S.api ? S.api.reduce((s,r)=>s+r.cost,0)    : 0;
+  const totRev  = S.api ? S.api.reduce((s,r)=>s+r.revenue,0) : 0;
+
+  const rolled = {};
+  if (S.api) {
+    for (const row of S.api) {
+      const plId = resolveToPlId(row.category_id, plIds);
+      if (!plId) continue;
+      if (!rolled[plId]) rolled[plId] = { cost: 0, revenue: 0, visits: 0 };
+      rolled[plId].cost    += row.cost;
+      rolled[plId].revenue += row.revenue;
+      rolled[plId].visits  += row.visits ?? 0;
+    }
+  }
+
+  const hasApi = S.api && S.api.length > 0;
+
+  return Array.from(plIds)
+    .filter(id => !hasApi || rolled[id])
+    .map(id => {
+      const cpcs   = S.pls.map(pl => avgCpc(pl, id));
+      const first  = cpcs.find(v => v !== null);
+      const last   = [...cpcs].reverse().find(v => v !== null);
+      const change = (first && last && first !== 0) ? (last - first) / first * 100 : null;
+      const agg    = rolled[id] || null;
+      const costPct = (agg && totCost > 0) ? agg.cost    / totCost * 100 : null;
+      const revPct  = (agg && totRev  > 0) ? agg.revenue / totRev  * 100 : null;
+      return { id, cpcs, change, costPct, revPct, costAbs: agg?.cost ?? null, revAbs: agg?.revenue ?? null, visits: agg?.visits ?? null };
+    });
+}
+
+// ── RENDER ALL ────────────────────────────────────────────────────────
+function renderAll() {
+  if (!S.pls.length) {
+    document.body.classList.add('no-pls');
+    document.getElementById('welcomeState').style.display='';
+    document.getElementById('dashboard').style.display='none';
+    return;
+  }
+  document.body.classList.remove('no-pls');
+  document.getElementById('welcomeState').style.display='none';
+  document.getElementById('dashboard').style.display='';
+  document.getElementById('legendRow').style.display = S.api ? '' : 'none';
+  renderSummary();
+  renderTable();
+}
+
+function renderSummary() {
+  const rows = buildRows();
+  const nUp   = rows.filter(r=>r.change!==null&&r.change>0.01).length;
+  const nDown = rows.filter(r=>r.change!==null&&r.change<-0.01).length;
+  const nSame = rows.length - nUp - nDown;
+  const ch = rows.filter(r=>r.change!==null);
+  const avgCh = ch.length ? ch.reduce((s,r)=>s+r.change,0)/ch.length : null;
+
+  const cards = [
+    ['Kategorie',    rows.length,  '#fff'],
+    ['Zdražilo',     nUp,          '#ff7f61'],
+    ['Zlevnilo',     nDown,        '#4ade80'],
+    ['Beze změny',   nSame,        'rgba(255,255,255,.4)'],
+    avgCh!==null ? ['Průměrná změna', (avgCh>0?'+':'')+avgCh.toFixed(1)+'%', avgCh>0?'#ff7f61':'#4ade80'] : null,
+  ].filter(Boolean);
+
+  document.getElementById('summCards').innerHTML = cards.map(([l,v,c])=>`
+    <div class="col-6 col-md">
+      <div class="card stat-card">
+        <div class="stat-val" style="color:${c}">${v}</div>
+        <div class="stat-lbl">${l}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────────
+function renderTable() {
+  const rows = buildRows();
+  const q = (document.getElementById('srchBox').value||'').toLowerCase();
+  const sort = document.getElementById('sortSel').value;
+  const chgOnly = document.getElementById('chgOnly').checked;
+  const hasApi = S.api && S.api.length>0;
+  const multiPl = S.pls.length>1;
+
+  let filtered = rows.filter(r=>{
+    if (q && !shortName(r.id).toLowerCase().includes(q) && !fullName(r.id).toLowerCase().includes(q)) return false;
+    if (chgOnly && !(r.change!==null && Math.abs(r.change)>0.01)) return false;
+    return true;
+  });
+
+  if (sort==='cost_pct')    filtered.sort((a,b)=>(b.costPct??-1)-(a.costPct??-1));
+  else if(sort==='rev_pct') filtered.sort((a,b)=>(b.revPct??-1)-(a.revPct??-1));
+  else if(sort==='change_desc') filtered.sort((a,b)=>(b.change??-Infinity)-(a.change??-Infinity));
+  else if(sort==='change_asc')  filtered.sort((a,b)=>(a.change??Infinity)-(b.change??Infinity));
+  else filtered.sort((a,b)=>shortName(a.id).localeCompare(shortName(b.id),'cs'));
+
+  document.getElementById('tHead').innerHTML = `<tr>
+    <th style="min-width:230px">Kategorie</th>
+    ${hasApi ? '<th class="text-center" style="min-width:68px">% nákl.</th><th class="text-center" style="min-width:68px">% tržeb</th><th class="text-center" style="min-width:72px">Prokliky</th>' : ''}
+    ${S.pls.map(pl=>`<th class="text-center" style="min-width:100px">${fmtLabel(pl.label)}</th>`).join('')}
+    ${multiPl ? '<th class="text-center" style="min-width:85px">Změna</th>' : ''}
+  </tr>`;
+
+  const rows_html = filtered.map(r => {
+    const isOpen = S.expanded.has(r.id);
+
+    const cpcCells = r.cpcs.map((v,i)=>{
+      if (v==null) return '<td class="text-center" style="color:rgba(255,255,255,.25)">—</td>';
+      const base = r.cpcs.find(x=>x!==null);
+      const cls = (i>0&&base!=null&&base!==0&&v!==base) ? (v>base?'cpc-up':'cpc-down') : '';
+      // step delta: change vs previous non-null value
+      let stepHtml = '';
+      if (i>0) {
+        const prev = [...r.cpcs.slice(0,i)].reverse().find(x=>x!==null);
+        if (prev!=null && prev!==0 && v!==prev) {
+          const pct = (v-prev)/prev*100;
+          const col = pct>0?'#ff6b6b':'#00d478';
+          const arr = pct>0?'↑':'↓';
+          stepHtml = `<div style="font-size:.65rem;color:${col};line-height:1;margin-top:2px">${arr}${Math.abs(pct).toFixed(1)}%</div>`;
+        }
+      }
+      return `<td class="text-center ${cls}">${fmtEur(v,3)}${stepHtml}</td>`;
+    }).join('');
+
+    const changeCell = multiPl ? (()=>{
+      if (r.change==null) return '<td class="text-center change-none">—</td>';
+      const cls = r.change>0.01?'change-up':r.change<-0.01?'change-down':'change-none';
+      const arr = r.change>0.01?'↑':r.change<-0.01?'↓':'–';
+      return `<td class="text-center ${cls}">${arr} ${Math.abs(r.change).toFixed(1)}%</td>`;
+    })() : '';
+
+    const apiCells = hasApi ? `
+      <td class="text-center">${r.costPct!=null?`<span class="pct-badge pct-cost" title="${fmtEur(r.costAbs,2)} z celkových nákladů">${r.costPct.toFixed(1)}%</span>`:'<span style="color:rgba(255,255,255,.25)">—</span>'}</td>
+      <td class="text-center">${r.revPct!=null?`<span class="pct-badge pct-rev" title="${fmtEur(r.revAbs,2)} z celkových tržeb">${r.revPct.toFixed(1)}%</span>`:'<span style="color:rgba(255,255,255,.25)">—</span>'}</td>
+      <td class="text-center" style="color:rgba(255,255,255,.75)">${r.visits!=null?r.visits.toLocaleString('cs-CZ'):'<span style="color:rgba(255,255,255,.25)">—</span>'}</td>` : '';
+
+    const fnLong = fullName(r.id);
+    const fnShort = shortName(r.id);
+    const mainRow = `<tr class="cat-row" onclick="toggleRow('${r.id}')" data-id="${r.id}">
+      <td>
+        <i class="bi bi-chevron-right expand-icon me-1${isOpen?' open':''}" id="ico-${r.id}"></i>
+        <span title="${fnLong}">${fnShort}</span>
+        ${fnLong!==fnShort?`<div style="font-size:.7rem;padding-left:1.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;color:rgba(255,255,255,.4)">${fnLong}</div>`:''}
+      </td>
+      ${apiCells}${cpcCells}${changeCell}
+    </tr>`;
+
+    const brackets = S.pls.length ? S.pls[0].brackets : [];
+    const detailRows = brackets.map(br => {
+      const brCpcs = S.pls.map(pl=>{
+        const cat = pl.categories.find(c=>c.id===r.id);
+        return cat ? (cat.cpcs[br]??null) : null;
+      });
+      const brFirst = brCpcs.find(v=>v!=null&&v>0);
+      const brLast  = [...brCpcs].reverse().find(v=>v!=null&&v>0);
+      const brCh    = (brFirst&&brLast&&brFirst!==0) ? (brLast-brFirst)/brFirst*100 : null;
+
+      const brCells = brCpcs.map((v,i)=>{
+        if(v==null||v===0) return '<td class="text-center" style="color:rgba(255,255,255,.2)">—</td>';
+        const cls = (i>0&&brFirst!=null&&brFirst!==0&&v!==brFirst)?(v>brFirst?'cpc-up':'cpc-down'):'';
+        let stepHtml = '';
+        if (i>0) {
+          const prev = [...brCpcs.slice(0,i)].reverse().find(x=>x!=null&&x>0);
+          if (prev!=null && prev!==0 && v!==prev) {
+            const pct = (v-prev)/prev*100;
+            const col = pct>0?'#ff6b6b':'#00d478';
+            const arr = pct>0?'↑':'↓';
+            stepHtml = `<div style="font-size:.65rem;color:${col};line-height:1;margin-top:2px">${arr}${Math.abs(pct).toFixed(1)}%</div>`;
+          }
+        }
+        return `<td class="text-center ${cls}">${fmtEur(v,3)}${stepHtml}</td>`;
+      }).join('');
+
+      const brChCell = multiPl ? (()=>{
+        if(brCh==null) return '<td class="text-center change-none">—</td>';
+        const cls=brCh>0.01?'change-up':brCh<-0.01?'change-down':'change-none';
+        const arr=brCh>0.01?'↑':brCh<-0.01?'↓':'–';
+        return `<td class="text-center ${cls}">${arr} ${Math.abs(brCh).toFixed(1)}%</td>`;
+      })() : '';
+
+      const apiBlank = hasApi ? '<td></td><td></td><td></td>' : '';
+
+      return `<tr class="detail-row detail-${r.id}" style="display:${isOpen?'':'none'}">
+        <td><span style="color:rgba(255,255,255,.25)" class="me-1">└</span>${br} €</td>
+        ${apiBlank}${brCells}${brChCell}
+      </tr>`;
+    }).join('');
+
+    return mainRow + detailRows;
+  }).join('');
+
+  document.getElementById('tBody').innerHTML = rows_html;
+  document.getElementById('rowCount').textContent = `${filtered.length} kategorií`;
+}
+
+function toggleRow(id) {
+  if (S.expanded.has(id)) S.expanded.delete(id); else S.expanded.add(id);
+  const show = S.expanded.has(id);
+  document.querySelectorAll(`.detail-${id}`).forEach(r=>r.style.display=show?'':'none');
+  const ico = document.getElementById('ico-'+id);
+  if (ico) ico.classList.toggle('open', show);
+}
+</script>
+</body>
+</html>

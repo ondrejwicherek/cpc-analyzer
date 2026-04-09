@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.heureka.group)",
+      "Bash(python -c \":*)",
+      "Bash(python3 -c \":*)",
+      "Bash(where py:*)",
+      "Bash(py --version)",
+      "Bash(py -c \":*)",
+      "Bash(py -m pip install openpyxl flask flask-cors)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/)",
+      "Bash(curl -s -X POST http://localhost:5000/api/parse-pricelist -F \"file=@C:/Users/Ondrej/Downloads/price-list-18. 3. 2026.xlsx\" -F \"label=test\")",
+      "Bash(netstat -ano)",
+      "Bash(curl -s http://localhost:5000/)",
+      "Bash(curl -s -X POST http://localhost:5000/api/parse-pricelist -F \"file=@C:/Users/Ondrej/Downloads/price-list-18. 3. 2026.xlsx\" -F \"label=2026-03-18\")",
+      "WebFetch(domain:www.heureka.sk)",
+      "Bash(curl -s \"http://localhost:5000/api/heureka-categories?market=sk\")",
+      "WebFetch(domain:mairateam.com)",
+      "WebFetch(domain:xmltocsv.mairateam.com)",
+      "Bash(curl -s \"https://xmltocsv.mairateam.com/\")",
+      "Bash(curl -s \"https://xmltocsv.mairateam.com/index.css\")",
+      "Bash(curl -s \"https://xmltocsv.mairateam.com/assets/index-DtjwkeXl.js\")",
+      "Bash(git config:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
