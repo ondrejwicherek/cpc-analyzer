@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 import requests
 import pandas as pd
@@ -191,6 +191,44 @@ def parse_pricelist():
         return jsonify({'label': label, 'categories': categories, 'brackets': brackets})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/preloaded-pricelists/<market>/index')
+def preloaded_index(market):
+    if market not in ('cz', 'sk'):
+        return jsonify({'error': 'Invalid market'}), 400
+    import json, os
+    path = os.path.join(os.path.dirname(__file__), 'static', 'data', f'{market}_index.json')
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        resp = jsonify(data)
+        resp.headers['Cache-Control'] = 'public, max-age=3600'
+        return resp
+    except FileNotFoundError:
+        return jsonify({'error': 'Index not found'}), 404
+
+@app.route('/api/preloaded-pricelists/<market>/<label>')
+def preloaded_one(market, label):
+    if market not in ('cz', 'sk'):
+        return jsonify({'error': 'Invalid market'}), 400
+    import json, os, re
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', label):
+        return jsonify({'error': 'Invalid label'}), 400
+    path = os.path.join(os.path.dirname(__file__), 'static', 'data', market, f'{label}.json')
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        resp = jsonify(data)
+        resp.headers['Cache-Control'] = 'public, max-age=86400'
+        return resp
+    except FileNotFoundError:
+        return jsonify({'error': 'Price list not found'}), 404
+
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory('static', filename)
 
 
 if __name__ == '__main__':

@@ -527,6 +527,7 @@ const S = {
   expanded: new Set(),
   hiddenPls: new Set(),  // labels of price lists whose columns are hidden
   market: null,    // 'cz' or 'sk'
+  allLabels: [],   // all known labels (including unloaded hidden ones)
 };
 
 // ── INIT ──────────────────────────────────────────────────────────────
@@ -759,10 +760,46 @@ function removePl(lbl) {
   buildNames(); renderPlList(); renderAll();
 }
 
-function togglePlVisibility(lbl) {
-  if (S.hiddenPls.has(lbl)) S.hiddenPls.delete(lbl);
-  else S.hiddenPls.add(lbl);
+// Labels that have been fetched (to avoid re-fetching)
+const S_fetched = new Set();
+
+async function togglePlVisibility(lbl) {
+  const wasHidden = S.hiddenPls.has(lbl);
+  if (!wasHidden) {
+    // Hiding — just toggle
+    S.hiddenPls.add(lbl);
+    renderPlList(); renderAll();
+    return;
+  }
+  // Showing — ensure data is loaded first
+  if (!S_fetched.has(lbl)) {
+    const item = await fetchOnePl(lbl);
+    if (item) {
+      S.pls.push(item);
+      S.pls.sort((a, b) => a.label.localeCompare(b.label));
+      S_fetched.add(lbl);
+      buildNames();
+    }
+  }
+  S.hiddenPls.delete(lbl);
   renderPlList(); renderAll();
+}
+
+async function fetchOnePl(lbl) {
+  // lbl is like "CZ: 2025-03-12"
+  const m = lbl.match(/^([A-Z]+):\s*(\d{4}-\d{2}-\d{2})$/);
+  if (!m) return null;
+  const market = m[1].toLowerCase();
+  const date   = m[2];
+  try {
+    const resp = await fetch(`/api/preloaded-pricelists/${market}/${date}`);
+    if (!resp.ok) return null;
+    const item = await resp.json();
+    return { label: lbl, brackets: item.brackets, categories: item.categories };
+  } catch(e) {
+    console.warn('fetchOnePl failed:', lbl, e);
+    return null;
+  }
 }
 
 async function selectMarket(market) {
@@ -780,19 +817,40 @@ async function selectMarket(market) {
 async function loadPreloaded(market) {
   const prefix = market === 'cz' ? 'CZ: ' : 'SK: ';
   try {
-    const resp = await fetch(`/static/data/${market}_pricelists.json`);
-    if (!resp.ok) return;
-    const data = await resp.json();
-    if (!Array.isArray(data)) return;
-    for (const item of data) {
-      const labelWithPrefix = prefix + item.label;
-      // Skip duplicates
-      if (S.pls.find(p => p.label === labelWithPrefix)) continue;
-      S.pls.push({ label: labelWithPrefix, brackets: item.brackets, categories: item.categories });
+    // 1. Fetch index (tiny — just a list of date strings)
+    const idxResp = await fetch(`/api/preloaded-pricelists/${market}/index`);
+    if (!idxResp.ok) return;
+    const allLabels = await idxResp.json();
+    if (!Array.isArray(allLabels) || !allLabels.length) return;
+
+    // 2. Show last 5 by default, hide the rest
+    const SHOW_LAST = 5;
+    const visibleLabels = allLabels.slice(-SHOW_LAST);
+    const hiddenLabels  = allLabels.slice(0, -SHOW_LAST);
+
+    // 3. Register ALL labels in S.allLabels for sidebar (even unloaded ones)
+    S.allLabels = allLabels.map(l => prefix + l);
+    hiddenLabels.forEach(l => S.hiddenPls.add(prefix + l));
+
+    // 4. Fetch last 5 in parallel
+    const results = await Promise.all(
+      visibleLabels.map(async date => {
+        const r = await fetch(`/api/preloaded-pricelists/${market}/${date}`);
+        if (!r.ok) return null;
+        const item = await r.json();
+        return { label: prefix + date, brackets: item.brackets, categories: item.categories };
+      })
+    );
+
+    for (const item of results) {
+      if (!item) continue;
+      if (S.pls.find(p => p.label === item.label)) continue;
+      S.pls.push(item);
+      S_fetched.add(item.label);
     }
     S.pls.sort((a, b) => a.label.localeCompare(b.label));
     buildNames(); renderPlList(); renderAll();
-    // Clear loading message now that data is loaded
+
     const plMsgEl = document.getElementById('plMsg');
     if (plMsgEl && plMsgEl.innerHTML.includes('Načítám')) plMsgEl.innerHTML = '';
   } catch(e) {
@@ -801,18 +859,20 @@ async function loadPreloaded(market) {
 }
 
 function renderPlList() {
-  // Column visibility toggles
+  // Column visibility toggles — use allLabels if available (includes unloaded ones)
+  const allLbls = S.allLabels || S.pls.map(p => p.label);
   const visEl = document.getElementById('colVisibility');
-  if (S.pls.length >= 1) {
+  if (allLbls.length >= 1) {
     visEl.innerHTML = `
       <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45);margin:1.2rem 0 .4rem;border-top:1px solid rgba(255,255,255,.08);padding-top:.9rem">
         Viditelnost sloupců
       </div>
-      ${S.pls.map(pl => {
-        const hidden = S.hiddenPls.has(pl.label);
-        const safeLabel = pl.label.replace(/'/g, "\\'");
+      ${allLbls.map(lbl => {
+        const hidden = S.hiddenPls.has(lbl);
+        const loaded = S_fetched.has(lbl) || S.pls.find(p => p.label === lbl);
+        const safeLabel = lbl.replace(/'/g, "\\'");
         return `<div class="col-vis-item">
-          <span class="col-vis-label${hidden?' hidden-pl':''}" title="${pl.label}">${fmtLabel(pl.label)}</span>
+          <span class="col-vis-label${hidden?' hidden-pl':''}" title="${lbl}">${fmtLabel(lbl)}${!loaded&&!hidden?'<span style="font-size:.65rem;color:rgba(255,255,255,.25);margin-left:.3rem">↓</span>':''}</span>
           <button class="btn-eye${hidden?' eye-hidden':''}" title="${hidden?'Zobrazit':'Skrýt'} sloupec"
             onclick="togglePlVisibility('${safeLabel}')">
             <i class="bi ${hidden?'bi-eye-slash':'bi-eye'}"></i>

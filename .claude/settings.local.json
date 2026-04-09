@@ -22,7 +22,17 @@
       "Bash(curl -s \"https://xmltocsv.mairateam.com/assets/index-DtjwkeXl.js\")",
       "Bash(git config:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)",
+      "Read(//c/Users/Ondrej/Desktop/SK_heureka_price_list/**)",
+      "Read(//c/Users/Ondrej/Desktop/CZ_heureka_price_list/**)",
+      "Bash(python convert_pricelists.py)",
+      "Bash(python3 /c/Users/Ondrej/CPC_analyzer/convert_pricelists.py)",
+      "Bash(py /c/Users/Ondrej/CPC_analyzer/convert_pricelists.py)",
+      "Bash(py -c ':*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(py -3 -c ':*)"
     ]
   }
 }
